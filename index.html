@@ -2,185 +2,79 @@
 <html>
 <head>
     <title>Drunk Escape</title>
-    <style>
-        body { margin:0; background:#222; }
-        canvas { display:block; margin:auto; background:#ddd; }
-    </style>
+    <script src="https://cdn.jsdelivr.net/npm/phaser@3.60.0/dist/phaser.js"></script>
 </head>
 <body>
 
-<canvas id="game" width="800" height="500"></canvas>
-
 <script>
-const canvas = document.getElementById("game");
-const ctx = canvas.getContext("2d");
-
-// игрок (жена)
-let player = {x:100,y:250,speed:2,dx:0,dy:0};
-
-// муж
-let husband = {
-    x:600,y:250,
-    speed:1.3,
-    mode:"chase",
-    timer:0,
-    text:"beer..."
+const config = {
+    type: Phaser.AUTO,
+    width: 800,
+    height: 500,
+    backgroundColor: "#2c2c2c",
+    scene: {
+        preload: preload,
+        create: create,
+        update: update
+    }
 };
 
-// управление
-let keys = {};
-document.addEventListener("keydown",e=>keys[e.key]=true);
-document.addEventListener("keyup",e=>keys[e.key]=false);
+const game = new Phaser.Game(config);
 
-// карта
-let walls = [
-    {x:0,y:0,w:800,h:10},
-    {x:0,y:490,w:800,h:10},
-    {x:0,y:0,w:10,h:500},
-    {x:790,y:0,w:10,h:500},
+let player;
+let husband;
+let cursors;
+let text;
 
-    {x:260,y:0,w:10,h:200},
-    {x:260,y:300,w:10,h:200},
-
-    {x:530,y:0,w:10,h:200},
-    {x:530,y:300,w:10,h:200},
-];
-
-let doors = [
-    {x:260,y:200,w:10,h:100},
-    {x:530,y:200,w:10,h:100},
-];
-
-// столкновения
-function isColliding(x,y){
-    for(let w of walls){
-        if(x > w.x-10 && x < w.x+w.w && y > w.y-10 && y < w.y+w.h){
-            return true;
-        }
-    }
-    return false;
+function preload() {
+    // простые спрайты (не квадраты)
+    this.load.image('wife', 'https://labs.phaser.io/assets/sprites/phaser-dude.png');
+    this.load.image('husband', 'https://labs.phaser.io/assets/sprites/robot.png');
 }
 
-// ПЬЯНОЕ управление 😄
-function movePlayer(){
-    if(keys["ArrowUp"]) player.dy -= 0.1;
-    if(keys["ArrowDown"]) player.dy += 0.1;
-    if(keys["ArrowLeft"]) player.dx -= 0.1;
-    if(keys["ArrowRight"]) player.dx += 0.1;
+function create() {
+    cursors = this.input.keyboard.createCursorKeys();
 
-    // инерция
-    player.dx *= 0.95;
-    player.dy *= 0.95;
+    // комнаты (визуально)
+    this.add.rectangle(150,250,300,500,0xffffff);
+    this.add.rectangle(400,125,300,250,0xffffff);
+    this.add.rectangle(400,375,300,250,0xffffff);
 
-    let nx = player.x + player.dx;
-    let ny = player.y + player.dy;
+    // стены
+    this.add.rectangle(260,100,10,200,0x000000);
+    this.add.rectangle(260,400,10,200,0x000000);
+    this.add.rectangle(530,100,10,200,0x000000);
+    this.add.rectangle(530,400,10,200,0x000000);
 
-    if(!isColliding(nx,ny)){
-        player.x = nx;
-        player.y = ny;
-    }
+    // персонажи
+    player = this.physics.add.sprite(100,250,'wife').setScale(0.5);
+    husband = this.physics.add.sprite(600,250,'husband').setScale(0.4);
+
+    text = this.add.text(10,10,"", {font:"16px Arial", fill:"#fff"});
 }
 
-// поведение мужа
-function moveHusband(){
-    husband.timer++;
+function update() {
+    player.setVelocity(0);
 
-    // переключение режимов
-    if(husband.timer % 200 === 0){
-        let r = Math.random();
-        if(r < 0.4){
-            husband.mode = "chase";
-            husband.text = "I SEE YOU!";
-        } else if(r < 0.7){
-            husband.mode = "golf";
-            husband.text = "golf... golf...";
-        } else {
-            husband.mode = "beer";
-            husband.text = "too much beer...";
-        }
-    }
+    if (cursors.left.isDown) player.setVelocityX(-200);
+    if (cursors.right.isDown) player.setVelocityX(200);
+    if (cursors.up.isDown) player.setVelocityY(-200);
+    if (cursors.down.isDown) player.setVelocityY(200);
 
-    if(husband.mode==="chase"){
-        let dx = player.x - husband.x;
-        let dy = player.y - husband.y;
+    // муж тупо преследует
+    let dx = player.x - husband.x;
+    let dy = player.y - husband.y;
 
-        let nx = husband.x + dx * 0.015;
-        let ny = husband.y + dy * 0.015;
+    husband.x += dx * 0.01;
+    husband.y += dy * 0.01;
 
-        if(!isColliding(nx,ny)){
-            husband.x = nx;
-            husband.y = ny;
-        }
-    }
-
-    if(husband.mode==="beer"){
-        // шатается
-        husband.x += Math.sin(husband.timer * 0.1);
-        husband.y += Math.cos(husband.timer * 0.1);
+    // текст поведения
+    let r = Math.random();
+    if (r < 0.01) {
+        if (r < 0.003) text.setText("golf...");
+        else text.setText("too much beer...");
     }
 }
-
-// жена
-function drawPlayer(){
-    ctx.fillStyle = "black";
-
-    ctx.fillRect(player.x, player.y, 12, 20);
-
-    ctx.beginPath();
-    ctx.arc(player.x+6, player.y-5, 5, 0, Math.PI*2);
-    ctx.fill();
-
-    ctx.fillText("~~~", player.x-6, player.y-10);
-}
-
-// муж
-function drawHusband(){
-    ctx.fillStyle = "darkgreen";
-
-    ctx.fillRect(husband.x, husband.y, 14, 22);
-
-    ctx.beginPath();
-    ctx.arc(husband.x+7, husband.y-5, 6, 0, Math.PI*2);
-    ctx.fill();
-
-    // баббл
-    ctx.fillStyle="white";
-    ctx.fillRect(husband.x-40, husband.y-35, 80, 20);
-
-    ctx.fillStyle="black";
-    ctx.fillText(husband.text, husband.x-35, husband.y-20);
-}
-
-// карта
-function drawMap(){
-    ctx.fillStyle = "black";
-    for(let w of walls){
-        ctx.fillRect(w.x,w.y,w.w,w.h);
-    }
-
-    ctx.fillStyle = "brown";
-    for(let d of doors){
-        ctx.fillRect(d.x,d.y,d.w,d.h);
-    }
-}
-
-// игра
-function draw(){
-    ctx.clearRect(0,0,800,500);
-
-    drawMap();
-    drawPlayer();
-    drawHusband();
-}
-
-function gameLoop(){
-    movePlayer();
-    moveHusband();
-    draw();
-    requestAnimationFrame(gameLoop);
-}
-
-gameLoop();
 </script>
 
 </body>
